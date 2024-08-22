@@ -1,0 +1,451 @@
+---
+title: "diab_project"
+author: "Joyce Choe"
+date: "2024-04-20"
+output: html_document
+---
+
+# BIOS 663 Group project - Diabetes data set
+
+```{r}
+diab <- read.table("C:/Users/guestuser/OneDrive - University of North Carolina at Chapel Hill/BIOS 663/groupproject/diabetes.tab.txt", header=TRUE)
+
+# preview data
+colnames(diab)
+library(dplyr)
+glimpse(diab)
+
+# change 1 variable to chr 
+sex = as.factor(diab$sex)
+
+#check var type 
+class(sex) 
+
+# preview data again
+glimpse(diab)
+
+# summary statistics of all numeric variables 
+summary(diab) 
+boxplot(diab)
+
+
+# importing required libraries 
+library(reshape2) 
+library(ggplot2) 
+  
+
+# Add new variable with y^(1/2) transformation variable
+diab$yt <- sqrt(diab$Y)
+
+# Mean-centering values 
+diab$BMI <- diab$BMI-mean(diab$BMI)
+diab$AGE <-diab$AGE-mean(diab$AGE)
+diab$BP <- diab$BP-mean(diab$BP)
+diab$S1 <- diab$S1-mean(diab$S1)
+diab$S2 <- diab$S2-mean(diab$S2)
+diab$S3 <- diab$S3-mean(diab$S3)
+diab$S4 <- diab$S4-mean(diab$S4)
+diab$S5 <- diab$S5-mean(diab$S5)
+# don't mean-center log values already transformed. 
+
+plot(x=diab$BMI, y=refit2$fitted.values)
+
+# # Forward/LAR
+
+library(MASS)
+
+refit2<-lm(Y~BMI+BP+as.factor(SEX)+S3+S5, data=diab) #< suggested model 
+summary(refit2)
+
+# test standardization
+full<-lm(Y~BMI+BP+AGE+as.factor(SEX)+S1+S2+S3+S4+S5, data=diab) #< suggested model 
+summary(full)
+
+sdy <-sd(diab$Y)
+sdx <- sd(diab$BMI)
+
+BMI2 <- 5.714*(sdx/sdy)
+BMI2
+
+
+diab$BMIc <- (diab$BMI/sd(diab$BMI))
+
+full2<-lm(Y~BMIc+BP+AGE+as.factor(SEX)+S1+S2+S3+S4+S5, data=diab) #< suggested model 
+summary(full2)
+
+plot(refit2$fitted.values, studres(refit2), main='R/P final model', xlab='Fitted values', ylab='Studentized residuals')
+abline(h=2, col = "gray")
+abline(h=-2, col = "gray")
+abline(h=0, col = "red")
+plot(refit2)
+plot(refit2, which=5, main='Residuals sqrt(y) vs Leverage')
+
+plot(full$fitted.values, studres(full), main='R/P full model', xlab='Fitted values', ylab='Studentized residuals')
+abline(h=2, col = "gray")
+abline(h=-2, col = "gray")
+abline(h=0, col = "red")
+
+
+library(car)
+crPlot(refit2, variable="BMI")
+crPlot(refit2, variable="BP")
+crPlot(refit2, variable="as.factor(SEX)")
+crPlot(refit2, variable="S3")
+crPlot(refit2, variable="S5")
+
+crPlot(full, variable="BMI")
+crPlot(full, variable="BP")
+crPlot(full, variable="as.factor(SEX)")
+crPlot(full, variable="S3")
+crPlot(full, variable="S5")
+
+plot(diab$S5, refit2$residuals)
+plot(diab$S5, refit1$residuals)
+
+
+refit1<-lm(Y~BMI+BP+as.factor(SEX)+S3+S5, data=diab) #< original model
+summary(refit1)
+plot(refit1$fitted.values, studres(refit1), main='Residuals vs Fitted y', xlab='Fitted values', ylab='Studentized residuals')
+abline(h=2, col = "gray")
+abline(h=-2, col = "gray")
+abline(h=0, col = "coral")
+
+#anova(refit2) #type I (added-in-order)
+refiti<-lm(yt~BMI+BP+as.factor(SEX)+S3+S5+BMI:BP+S3:S5+as.factor(SEX):BMI+as.factor(SEX):BP+as.factor(SEX):S3+as.factor(SEX):S5+BMI:S5+BP:S3+BP:S5+BMI:S3, data=diab) 
+summary(refiti)
+
+
+
+
+
+library(car)
+boxCox(full)
+summary(test3)
+
+library(MASS)
+test<-boxcox(full)
+summary(test)
+
+
+
+test<-powerTransform(full)
+summary(test) # neither 0 or 1 is optimal transformation since p-val <0.05
+test$roundlam # estimate lambda = 0.5
+boxcox(full) # lambda has highest log(L) at 0.5
+
+```
+
+
+```{r simple corr}
+
+cmat <-cor(diab)
+cmat
+cmat2 <- round(cmat, 2) #corr matrix rounded to 2 decimal places
+cmat2
+
+# Sex has almost no correlation with y (not linear) r=0.04
+# BMI r=0.59 and S5 r=0.50 linearly associated (postive correlation) with y.
+
+# simple correlation matrices
+library(ggcorrplot)
+ggcorrplot(cmat, colors=c("red","white","blue3"))
+
+library(corrgram)
+corrgram(diab, lower.panel=panel.ellipse)
+
+# Every variable except sex may have a linear relationship with Y.
+# Also drop S4 because redundant with total S1 and hdl S2.
+# Possibly linear predictors: age, bmi, bp, s1, s2, s3, s5, s6
+
+# partial correlation matrix after controlling for SEX
+library(psych)
+pcmat_sex <- partial.r(diab, # input the data matrix
+                   x=names(diab)[-2], #input names of all other predictors except Z
+                   y="SEX") # specify the Z variable, here they call it "y"...
+pcmat_sex
+
+# partial correlation matrix after controlling for AGE
+pcmat_age <- partial.r(diab, # input the data matrix
+                   x=names(diab)[-1], #input names of all other predictors except Z
+                   y="AGE") # specify the Z variable, here they call it "y"...
+pcmat_age
+cmat2
+
+ggcorrplot(pcmat_age, colors=c("red","white","blue3"))
+
+# Note - S6 is generally correlated with all covariates and response. When fitting a model, other variables may take over S6's contribution to y-variance.
+
+```
+
+
+
+```{r diagnostics}
+
+library(MASS)
+fit <- lm(Y~ AGE + SEX + BMI +BP + S1+S2 +S3+S4+S5+S6, data=diab)
+
+plot(fit, 1) #full model is approximately linear, should be horizontal line in R/P plot
+plot(fit, 2) #full model residuals are approximately normal, QQ plot
+plot(fit, 3) #full model check for heteroscadascety of variances in std R/P plot not met, should be horizontal line about 0
+
+studres <- studres(fit) 
+plot(diab$AGE, studres)
+abline(h=0)
+plot(diab$SEX, studres)
+abline(h=0)
+plot(diab$BMI, studres)
+abline(h=0)
+plot(diab$BP, studres)
+abline(h=0)
+plot(diab$S1, studres)
+abline(h=0)
+plot(diab$S2, studres)
+abline(h=0)
+plot(diab$S3, studres)
+abline(h=0)
+plot(diab$S4, studres)
+abline(h=0)
+plot(diab$S5, studres)
+abline(h=0)
+plot(diab$S6, studres)
+abline(h=0)
+
+fitage <- lm(Y~ AGE, data=diab)
+plot(fitage)
+fitsex <- lm(Y~ SEX, data=diab)
+plot(fitsex)
+fitbmi <- lm(Y~ BMI, data=diab)
+plot(fitbmi)
+fitbp <- lm(Y~ BP, data=diab)
+plot(fitbp)
+fits1 <- lm(Y~ S1, data=diab)
+plot(fits1)
+fits2 <- lm(Y~ S2, data=diab)
+plot(fits2)
+fits3 <- lm(Y~ S3, data=diab)
+plot(fits3)
+fits4 <- lm(Y~ S4, data=diab)
+plot(fits4)
+fits5 <- lm(Y~ S5, data=diab)
+plot(fits5)
+fits6 <- lm(Y~ S6, data=diab)
+plot(fits6)
+
+
+```
+
+
+
+
+```{r box-tidwell}
+
+library(car)
+
+# Backwards selection full model w/o nonlinear sex variable, redundant S4 ratio variable
+full <- lm(Y~+AGE+BMI+BP+S1+S2+S3+S5+S6, data=diab)
+summary(full)
+
+# Remove age
+full1 <- lm(Y~BMI+BP+S1+S2+S3+S5+S6, data=diab)
+summary(full1)
+
+# 1.  Remove S1(total cholesterol), then S3(LDL)+S5(triglyceride) become sig
+full2 <- lm(Y~BMI+BP+S2+S3+S5+S6, data=diab)
+summary(full2)
+
+# 2.  Remove S3 (LDL), then S1(total cholesterol)+S5(triglyceride) become sig
+full3 <- lm(Y~BMI+BP+S1+S2+S5+S6, data=diab)
+summary(full3)
+
+# Indicates S1 (total cholesterol) and S3 (LDL) are collinear.
+
+# 1. bmi, bp, s3(ldl), s5(tri) are useful predictors of diabetes progression.
+# 2. bmi, bp, s1 (total), s2(hdl), s5(tri) are useful predictors of diabetes progression.
+
+
+# Transform predictors using Box-Tidwell approach for useful predictors #1. 
+boxTidwell(Y~BMI+S1+S2+S3, data=diab) 
+
+# BMI is sig. BMI^3 
+# S5 is sig. log(S5)
+
+
+```
+
+
+
+
+
+```{r}
+
+library(car)
+# Determine transformation of response using Box-cox
+test1 <- powerTransform(Y~BMI+BP+S1+S2+S5, data=diab)
+summary(test1) # p-value
+test1$roundlam # estimate lambda = 0.5
+
+test2 <- boxCox(lm(Y~BMI+BP+S1+S2+S5, data=diab)) # neither 0 or 1 is optimal transformation since p-val <0.05, so transformation is recommended.
+summary(test2)
+
+test3 <- boxCox(lm(Y~BMI+BP+S3+S5, data=diab))
+summary(test3)
+
+# Add new variable with y^(1/2) transformation variable
+diab$yt <- diab$Y^0.5
+
+
+
+# Possible final models: 
+
+# Backward
+# F-stat = 117.4, df=438, RSE = 2.37, R^2 = 0.442
+refit<-lm(yt~BMI+BP+S5, data=diab)
+summary(refit)
+Anova(refit, type="III")
+
+# Forward/LAR
+# F-stat = 94.45, df=437, RSE = 2.34, R^2 = 0.459
+refit2<-lm(yt~BMI+BP+S3+S5, data=diab) #< suggested model 
+summary(refit2)
+anova(refit2) #type I
+
+# # Forward/LAR
+# F-stat = 94.45, df=437, RSE = 2.34, R^2 = 0.459
+refit2<-lm(yt~BMI+BP+S3+S5, data=diab) #< suggested model 
+summary(refit2)
+plot(refit2)
+anova(refit2) #type I (added-in-order)
+
+# Intuitive 
+# F-stat = 92.37, df=438, RSE=2.49, R^2 = 0.383
+refit3<-lm(yt~BMI+BP+S6, data=diab)
+summary(refit3)
+
+
+# Interaction model
+# F-stat = 40.17, df=431, RSE=2.31, R^2 = 0.470
+refit2i<-lm(yt~BMI+BP+S3+S5+BMI*BP+BMI*S3+BMI*S5+BP*S3+BP*S5+S3*S5, data=diab)
+summary(refit2i)
+plot(refit2i)
+
+# Poly interaction model
+# F-stat=30.78, df=427, RSE=2.28, R^2 = 0.486
+refit2p<-lm(yt~poly(BMI,BP,S3,S5, degree=2, raw=TRUE), data=diab)
+summary(refit2p)
+plot(refit2)
+
+
+diab$bmigroup <- ordered(ifelse(diab$BMI<18.5, 'underweight',
+                     ifelse(diab$BMI>=18.5 & diab$BMI<25, 'normal weight',
+                     ifelse(diab$BMI>=25 & diab$BMI<30, 'overweight',
+                     ifelse(diab$BMI>=30, 'obese', 'NA')))))
+
+interaction.plot(diab$BP, trace.factor=diab$bmigroup, response=diab$yt)
+
+# Original: 
+
+# F-stat = 124.7, df=438, RSE = 56.8, R^2 = 0.457
+fit <- lm(Y~BMI+BP+S5, data=diab)
+summary(fit)
+
+# F-stat = 99.1, df=437, RSE = 56.1, R^2 = 0.471
+fit2 <- lm(Y~BMI+BP+S3+S5, data=diab)
+summary(fit2)
+
+# F-stat = 100.5, df=438, RSE = 59.5, R^2 = 0.404
+fit3 <- lm(Y~BMI+BP+S6, data=diab)
+summary(fit3)
+
+```
+
+
+
+```{r}
+
+# Plots before vs. after transformation
+
+plot(diab$BMI, diab$Y, main ='Before')
+plot(diab$BMI, diab$yt, main = 'After')
+
+plot(diab$BP, diab$Y, main ='Before')
+plot(diab$BP, diab$yt, main = 'After')
+
+plot(diab$S1, diab$Y, main ='Before')
+plot(diab$S1, diab$yt, main = 'After')
+
+plot(diab$S2, diab$Y, main ='Before')
+plot(diab$S2, diab$yt, main = 'After')
+
+plot(diab$S3, diab$Y, main ='Before')
+plot(diab$S3, diab$yt, main = 'After')
+
+plot(diab$S5, diab$Y, main ='Before')
+plot(diab$S5, diab$yt, main = 'After')
+
+plot(diab$S6, diab$Y, main ='Before')
+plot(diab$S6, diab$yt, main = 'After')
+
+# Residual*predictor plots
+plot(diab$BMI, fit2$residuals, main='Residuals before')
+abline(h=0)
+
+
+
+plot(diab$BMI, refit2$residuals, main='Residuals after')
+abline(h=0)
+
+plot(diab$BMI, refit3$residuals, main='Residuals after')
+abline(h=0)
+plot(diab$BMI, refit$residuals, main='Residuals after')
+abline(h=0)
+
+plot(diab$BP, fit2$residuals, main='Residuals before')
+abline(h=0)
+plot(diab$BP, refit$residuals, main='Residuals after')
+abline(h=0)
+plot(diab$BP, refit2$residuals, main='Residuals after')
+abline(h=0)
+plot(diab$BP, refit3$residuals, main='Residuals after')
+abline(h=0)
+
+plot(diab$S3, fit2$residuals, main='Residuals before')
+abline(h=0)
+plot(diab$S3, refit$residuals, main='Residuals after')
+abline(h=0)
+plot(diab$S3, refit2$residuals, main='Residuals after')
+abline(h=0)
+plot(diab$S3, refit3$residuals, main='Residuals after')
+abline(h=0)
+
+plot(diab$S5, fit2$residuals, main='Residuals before')
+abline(h=0)
+plot(diab$S5, refit$residuals, main='Residuals after')
+abline(h=0)
+plot(diab$S5, refit2$residuals, main='Residuals after')
+abline(h=0)
+plot(diab$S5, refit3$residuals, main='Residuals after')
+abline(h=0)
+
+
+# quantile normal plots
+
+
+qqPlot(full$residuals, main='QQ plot full model', ylab='Residuals')
+hist(full$residuals, main='Residuals y', xlab='residuals')
+qqplot(full$residuals, main='Residuals QQ plot', ylab='residual quantiles') 
+
+qqPlot(refit2$residuals, main='QQ plot final model', ylab='Residuals')
+hist(refit2$residuals, main='Residuals y', xlab='residuals')
+
+# 
+
+
+```
+
+
+
+
+
+
+
+
