@@ -1,2 +1,2 @@
 # diabetes
-BIOS 663:  Group project 
+BIOS 663: Intermediate Linear Models Group project 
